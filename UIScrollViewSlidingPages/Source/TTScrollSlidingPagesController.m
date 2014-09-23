@@ -38,6 +38,7 @@
 @interface TTScrollSlidingPagesController ()
 
 @property (nonatomic, strong) NSMutableArray *titleLabels;
+@property (nonatomic) CGPoint contentStartPoint;
 
 @end
 
@@ -82,6 +83,7 @@
         self.pagingEnabled = YES;
         self.zoomOutAnimationDisabled = NO;
         self.hideStatusBarWhenScrolling = NO;
+        self.moveTitleScrollerOverContent = NO;
     }
     return self;
 }
@@ -122,7 +124,7 @@
                 /*start at the top of the nextYPosition, but dont increment the yposition, so this means the triangle sits on top of the topscroller and cuts into it a bit*/
                 triangleFrame = CGRectMake(self.view.frame.size.width/2-(self.triangleSize.width/2), nextYPosition, self.triangleSize.width, self.triangleSize.height);
             } else if (self.triangleType == TTTriangleTypeBottom) {
-                triangleFrame = CGRectMake(self.view.frame.size.width/2-(self.triangleSize.width/2), nextYPosition - self.triangleSize.height, self.triangleSize.width, self.triangleSize.height);
+                triangleFrame = CGRectMake(self.view.frame.size.width/2-(self.triangleSize.width/2), nextYPosition + self.titleScrollerHeight - self.triangleSize.height, self.triangleSize.width, self.triangleSize.height);
             }
         }
 
@@ -163,9 +165,17 @@
         [topScrollViewWrapper bringSubviewToFront:barView];
     }
     
-    
-    //set up the bottom scroller (for the content to go in)
-    bottomScrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(0, nextYPosition, self.view.frame.size.width, self.view.frame.size.height-nextYPosition)];
+
+    //set up the bottom scroller (for the content to go in)    
+    if (self.moveTitleScrollerOverContent) {
+        bottomScrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, self.view.frame.size.height)];
+        self.contentStartPoint = CGPointMake(0, nextYPosition);
+    }
+    else {
+        bottomScrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(0, nextYPosition, self.view.frame.size.width, self.view.frame.size.height-nextYPosition)];
+        self.contentStartPoint = CGPointMake(0, 0);
+    }
+
     bottomScrollView.pagingEnabled = self.pagingEnabled;
     bottomScrollView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleHeight;
     bottomScrollView.showsVerticalScrollIndicator = NO;
@@ -176,18 +186,20 @@
     [self.view addSubview:bottomScrollView];
     
     //add the drop shadow on the top scroller (if enabled) and bring the view to the front
-    if (!self.titleScrollerHidden && !self.disableTitleScrollerShadow){
-        topScrollViewWrapper.layer.masksToBounds = NO;
-        topScrollViewWrapper.layer.shadowOffset = CGSizeMake(0, 4);
-        topScrollViewWrapper.layer.shadowRadius = 4;
-        topScrollViewWrapper.layer.shadowOpacity = 0.3;
-        
-        //Add shadow path (better performance)
-        CGPathRef shadowPath = [UIBezierPath bezierPathWithRect:topScrollViewWrapper.bounds].CGPath;
-        [topScrollViewWrapper.layer setShadowPath:shadowPath];
-        //rasterize (also due to the better performance)
-        topScrollViewWrapper.layer.shouldRasterize = YES;
-        topScrollViewWrapper.layer.rasterizationScale = [UIScreen mainScreen].scale;
+    if (!self.titleScrollerHidden) {
+        if (!self.disableTitleScrollerShadow) {
+            topScrollViewWrapper.layer.masksToBounds = NO;
+            topScrollViewWrapper.layer.shadowOffset = CGSizeMake(0, 4);
+            topScrollViewWrapper.layer.shadowRadius = 4;
+            topScrollViewWrapper.layer.shadowOpacity = 0.3;
+            
+            //Add shadow path (better performance)
+            CGPathRef shadowPath = [UIBezierPath bezierPathWithRect:topScrollViewWrapper.bounds].CGPath;
+            [topScrollViewWrapper.layer setShadowPath:shadowPath];
+            //rasterize (also due to the better performance)
+            topScrollViewWrapper.layer.shouldRasterize = YES;
+            topScrollViewWrapper.layer.rasterizationScale = [UIScreen mainScreen].scale;
+        }
         
         [self.view bringSubviewToFront:topScrollViewWrapper];//bring view to sit on top so you can see the shadow!
     }
@@ -203,6 +215,8 @@
 }
 
 -(void)viewDidAppear:(BOOL)animated{
+    [super viewDidAppear:animated];
+
     if (!viewDidAppearHasBeenCalled){
         viewDidAppearHasBeenCalled = YES;
         [self reloadPages];
@@ -271,7 +285,7 @@
             label.font = i == 0 ? self.titleScrollerTextSelectedFont : self.titleScrollerTextFont;
             label.backgroundColor = [UIColor clearColor];
 
-            if (self.disableTitleShadow) {
+            if (!self.disableTitleShadow) {
                 //add subtle drop shadow
                 label.layer.shadowColor = [self.titleScrollerTextDropShadowColour CGColor];
                 label.layer.shadowOffset = CGSizeMake(0.0f, 0.0f);
@@ -357,6 +371,36 @@
     }
     
     return page;
+}
+
+/**
+ Gets the topScrollViewWrapper view
+ 
+ @return Returns the topScrollViewWrapper view
+ */
+- (TTScrollViewWrapper *)getTitleScrollViewWrapper
+{
+    return topScrollViewWrapper;
+}
+
+/**
+ Gets the bottomScrollView view
+ 
+ @return Returns the bottomScrollView view
+ */
+- (UIScrollView *)getBottomScrollView
+{
+    return bottomScrollView;
+}
+
+/**
+ Gets the topScrollView view
+ 
+ @return Returns the topScrollView view
+ */
+- (UIScrollView *)getTopScrollView
+{
+    return topScrollView;
 }
 
 /**
@@ -482,6 +526,10 @@
     }
 }
 
+- (CGPoint)getContentStartPoint
+{
+    return self.contentStartPoint;
+}
 
 #pragma mark Some delegate methods for handling rotation.
 
@@ -662,7 +710,7 @@
 -(void)pageControlChangedPage:(id)sender
 {
     //if not already on the page and the page is within the bounds of the pages we have, scroll to the page!
-    int page = pageControl.currentPage;
+    int page = (int)pageControl.currentPage;
     if ([self getCurrentDisplayedPage] != page && page < [bottomScrollView.subviews count]){
         [self scrollToPage:page animated:YES];
     }

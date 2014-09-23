@@ -53,7 +53,12 @@
 -(void)scrollToPage:(int)page animated:(BOOL)animated;
 -(int)getCurrentDisplayedPage;
 -(int)getXPositionOfPage:(int)page;
+- (CGPoint)getContentStartPoint;
 
+// These could probably be properties, but didn't want to refactor everything for now
+- (TTScrollViewWrapper *)getTitleScrollViewWrapper;
+- (UIScrollView *)getBottomScrollView;
+- (UIScrollView *)getTopScrollView;
 
 
 @property (nonatomic, weak) id<TTSlidingPagesDataSource> dataSource;
@@ -178,6 +183,10 @@
  **/
 @property (nonatomic) bool hideStatusBarWhenScrolling;
 
+/**  @property moveTitleScrollerOverContent
+ *   @brief Moves the title scroll to sit on top of the bottom scrollview instead of next to it. This can be used to scroll data under the title scroller.
+ *   Default is NO **/
+@property (nonatomic) BOOL moveTitleScrollerOverContent;
 
 
 @end
